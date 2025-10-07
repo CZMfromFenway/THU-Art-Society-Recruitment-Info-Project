@@ -1,0 +1,114 @@
+import requests
+import time
+import pandas as pd
+from datetime import datetime
+import os
+
+import collect_raw_data
+import parse_raw_data
+import uploader
+
+class RecruitmentDataSync:
+
+    wjx_url: str
+    wjx_cookie: str
+    raw_data_file: str
+    grouped_data_dir: str
+    feishu_token: str
+    uploader = uploader.Uploader()
+    period = 500
+
+    def __init__(self, wjx_url, wjx_cookie, raw_data_file, grouped_data_dir, feishu_token, preiod = 500):
+        self.wjx_url = wjx_url
+        self.wjx_cookie = wjx_cookie
+        self.raw_data_file = raw_data_file
+        self.grouped_data_dir = grouped_data_dir
+        self.feishu_token = feishu_token
+        self.period = preiod
+
+    def start(reset = False):
+
+        if reset:
+            RecruitmentDataSync.feishu_token = RecruitmentDataSync.uploader.reset_all_sheets(RecruitmentDataSync.feishu_token)
+            print("重置飞书表格完成")
+            if os.path.exists(RecruitmentDataSync.raw_data_file):
+                os.remove(RecruitmentDataSync.raw_data_file)
+                print("删除本地原始数据完成")
+            if os.path.exists(RecruitmentDataSync.grouped_data_dir):
+                for file in os.listdir(RecruitmentDataSync.grouped_data_dir):
+                    os.remove(os.path.join(RecruitmentDataSync.grouped_data_dir, file))
+                print("删除本地分组数据完成")
+
+        output_file = RecruitmentDataSync.raw_data_file
+        
+        # 解析Cookie
+        cookies = {}
+        for item in RecruitmentDataSync.wjx_cookie.split(';'):
+            item = item.strip()
+            if '=' in item:
+                key, value = item.split('=', 1)
+                cookies[key] = value
+        
+        # 设置请求参数
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Referer': 'https://www.wjx.cn/',
+            'Accept': 'application/vnd.ms-excel'
+        }
+        
+        session = requests.Session()
+        session.cookies.update(cookies)
+        
+        # 创建数据指纹集合，用于去重
+        existing_hashes = set()
+        
+        # 如果已有数据文件，加载现有数据的指纹
+        if os.path.exists(output_file):
+            try:
+                existing_data = pd.read_excel(output_file)
+                print(f"发现现有数据文件，共 {len(existing_data)} 条记录")
+                
+                # 为现有数据生成指纹
+                for _, row in existing_data.iterrows():
+                    # 排除时间戳列生成指纹
+                    row_without_time = row.drop('导出时间') if '导出时间' in row else row
+                    row_hash = collect_raw_data.generate_row_hash(row_without_time)
+                    existing_hashes.add(row_hash)
+                    
+                print(f"已加载 {len(existing_hashes)} 个数据指纹用于去重")
+            except Exception as e:
+                print(f"读取现有数据文件时出错: {e}")
+        
+        print("开始定时导出数据(每5秒)...")
+        print("按 Ctrl+C 停止")
+
+        count = 0
+        data_count = 0
+        duplicate_count = 0
+
+        try:
+            while True:
+                count += 1
+                print(f"\n第 {count} 次尝试导出...")
+                
+                new_data_count, duplicate_count = collect_raw_data.export(session, RecruitmentDataSync.wjx_url, headers, output_file, existing_hashes, data_count, duplicate_count)
+                
+                if new_data_count > data_count:
+                    data_count = new_data_count
+                    # 数据归类
+                    time_str = parse_raw_data.process_recruitment_data(output_file, RecruitmentDataSync.grouped_data_dir, datetime.now())
+                    # 上传飞书
+                    RecruitmentDataSync.feishu_token = RecruitmentDataSync.uploader.parse_excel(RecruitmentDataSync.feishu_token, RecruitmentDataSync.grouped_data_dir, time_str)
+                
+                # 等待
+                for i in range(5, 0, -1):
+                    print(f"\r下次尝试: {i}秒后", end='', flush=True)
+                    time.sleep(1)
+                print('\r', end='', flush=True)
+                
+        except KeyboardInterrupt:
+            print(f"\n\n程序已停止。总共处理: {count} 次导出")
+            print(f"新增数据: {new_data_count} 条")
+            print(f"跳过重复: {duplicate_count} 条")
+        except Exception as e:
+            print(f"发生错误: {e}")
