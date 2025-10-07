@@ -3,6 +3,8 @@ import time
 import pandas as pd
 from datetime import datetime
 import os
+import json
+import argparse
 
 import collect_raw_data
 import parse_raw_data
@@ -112,3 +114,22 @@ class RecruitmentDataSync:
             print(f"跳过重复: {duplicate_count} 条")
         except Exception as e:
             print(f"发生错误: {e}")
+
+if __name__ == "__main__":
+
+    # 根据json配置参数
+    with open('config/config.json', 'r', encoding='utf-8') as f:
+        config = json.load(f)
+        wjx_url = config.get('wjx_url')  # 替换为实际问卷链接
+        wjx_cookie = config.get('wjx_cookie')  # 替换为实际Cookie
+        raw_data_file = config.get('raw_data_file', 'raw_data\问卷数据.xlsx')
+        grouped_data_dir = config.get('grouped_data_dir', 'grouped_data')
+        feishu_token = config.get('feishu_token')  # 替换为实际飞书API Token
+        period = config.get('period', 500)
+    
+    # 命令行参数：--reset / -r 指定是否重置之前的数据（默认 False）
+    parser = argparse.ArgumentParser(description="Recruitment data sync runner")
+    parser.add_argument('-r', '--reset', action='store_true', help='重置飞书表格和本地数据（默认否）')
+    args = parser.parse_args()
+
+    RecruitmentDataSync(wjx_url, wjx_cookie, raw_data_file, grouped_data_dir, feishu_token, period).start(args.reset)
