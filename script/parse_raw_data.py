@@ -73,12 +73,13 @@ def create_highlighted_excel(df, output_filename):
                     'format': highlight_format
                 })
 
-def process_recruitment_data(file_path, cutoff_time = datetime.min):
+def process_recruitment_data(file_path, cutoff_time = datetime.min) -> str:
     """
     处理美术社招新报名表，按组别筛选并导出面试信息
-    
+
     :param file_path: 报名表文件路径
     :param cutoff_time: 筛选提交时间晚于此时间的记录，默认为很久以前
+    :return: 返回时间字符串以便上传程序找到应上传的表格
     """
     try:
         # 读取Excel文件
@@ -120,6 +121,7 @@ def process_recruitment_data(file_path, cutoff_time = datetime.min):
         promotion_interest_column = '14、是否有兴趣加入美社宣传小组，接受宣传技能培训，参与平面设计、专栏采写、文创IP策划等业务'
         
         # 处理每个组别
+        time_str = datetime.now().strftime('%Y%m%d_%H%M%S')
         for group_name, priority_column in groups.items():
             print(f"\n正在处理{group_name}...")
             
@@ -215,13 +217,15 @@ def process_recruitment_data(file_path, cutoff_time = datetime.min):
             result_df = result_df[final_columns]
             
             # 保存为带有条件格式的Excel文件
-            output_filename = f"grouped_data\{group_name}面试信息_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+            output_filename = f"grouped_data\{group_name}面试信息_{time_str}.xlsx"
             create_highlighted_excel(result_df, output_filename)
             print(f"  {group_name}面试信息已保存为: {output_filename}")
             
             # 显示前几行作为预览
             print(f"  数据预览（前3行）:")
             print(result_df.head(3).to_string(index=False))
+
+            return time_str  # 返回时间字符串以便上传程序找到应上传的表格
             
     except Exception as e:
         print(f"处理过程中出现错误: {e}")
