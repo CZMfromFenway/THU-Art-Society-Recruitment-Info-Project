@@ -179,6 +179,56 @@ def advanced_filter_duplicates(new_data, existing_data=None):
     
     return new_data[unique_mask]
 
+def export(session, url, headers, output_file, existing_hashes, new_data_count, duplicate_count):
+    response = session.get(url, headers=headers, timeout=10)
+            
+    # 检查是否是Excel文件
+    content_type = response.headers.get('Content-Type', '').lower()
+    if 'excel' in content_type or 'spreadsheet' in content_type:
+        # 处理Excel文件
+        temp_file = f"temp_{datetime.now().strftime('%H%M%S')}.xlsx"
+        with open(temp_file, 'wb') as f:
+            f.write(response.content)
+        
+        # 读取新数据
+        new_data = pd.read_excel(temp_file)
+        new_data['导出时间'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        
+        # 过滤重复数据
+        unique_new_data = filter_duplicates(new_data, existing_hashes)
+        
+        if len(unique_new_data) > 0:
+            # 追加到主文件
+            if os.path.exists(output_file):
+                existing_data = pd.read_excel(output_file)
+                combined_data = pd.concat([existing_data, unique_new_data], ignore_index=True)
+                combined_data.to_excel(output_file, index=False)
+            else:
+                unique_new_data.to_excel(output_file, index=False)
+            
+            # 更新指纹集合
+            for _, row in unique_new_data.iterrows():
+                row_without_time = row.drop('导出时间')
+                row_hash = generate_row_hash(row_without_time)
+                existing_hashes.add(row_hash)
+            
+            new_data_count += len(unique_new_data)
+            print(f"✓ 新增 {len(unique_new_data)} 条记录 - {datetime.now().strftime('%H:%M:%S')}")
+        else:
+            duplicate_count += len(new_data)
+            print(f"○ 无新数据，跳过 {len(new_data)} 条重复记录")
+        
+        os.remove(temp_file)
+                
+    else:
+        print("× 响应不是Excel文件")
+        print(f"状态码: {response.status_code}")
+        print(f"内容类型: {response.headers.get('Content-Type')}")
+            
+    # 显示统计信息
+    print(f"累计: 新增 {new_data_count} 条, 跳过 {duplicate_count} 条重复数据")
+    return new_data_count, duplicate_count
+
 # 运行程序
 if __name__ == "__main__":
     manual_cookie_exporter()

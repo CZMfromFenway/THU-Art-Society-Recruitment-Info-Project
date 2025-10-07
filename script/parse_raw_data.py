@@ -73,7 +73,7 @@ def create_highlighted_excel(df, output_filename):
                     'format': highlight_format
                 })
 
-def process_recruitment_data(file_path, cutoff_time = datetime.min) -> str:
+def process_recruitment_data(file_path, output_dir = "grouped_data", cutoff_time = datetime.min) -> str:
     """
     处理美术社招新报名表，按组别筛选并导出面试信息
 
@@ -217,7 +217,7 @@ def process_recruitment_data(file_path, cutoff_time = datetime.min) -> str:
             result_df = result_df[final_columns]
             
             # 保存为带有条件格式的Excel文件
-            output_filename = f"grouped_data\{group_name}面试信息_{time_str}.xlsx"
+            output_filename = f"{output_dir}\{group_name}面试信息_{time_str}.xlsx"
             create_highlighted_excel(result_df, output_filename)
             print(f"  {group_name}面试信息已保存为: {output_filename}")
             
