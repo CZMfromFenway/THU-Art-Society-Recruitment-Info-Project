@@ -73,9 +73,10 @@ def create_highlighted_excel(df, output_filename):
                     'format': highlight_format
                 })
 
-def process_recruitment_data(file_path, cutoff_time=datetime.min):
+def process_recruitment_data(file_path, cutoff_time = datetime.min):
     """
     处理美术社招新报名表，按组别筛选并导出面试信息
+    
     :param file_path: 报名表文件路径
     :param cutoff_time: 筛选提交时间晚于此时间的记录，默认为很久以前
     """
