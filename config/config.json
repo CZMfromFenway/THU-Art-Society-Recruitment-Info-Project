@@ -1,0 +1,8 @@
+{
+    "wjx_url": "https://www.wjx.cn/joinnew/JoinNew.aspx?activity=12345678",
+    "wjx_cookie": "your_cookie_here",
+    "raw_data_file": "raw_data/问卷数据.xlsx",
+    "grouped_data_dir": "grouped_data",
+    "feishu_token": "your_feishu_token_here",
+    "period": 500
+}
