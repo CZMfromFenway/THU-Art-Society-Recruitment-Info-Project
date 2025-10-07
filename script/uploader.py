@@ -3,18 +3,43 @@ import http.client
 import json
 import os
 
-class Uploader:
+# 模块说明：用于将本地生成的面试信息表上传到飞书表格，并提供清空/查询表格行数等工具函数。
+# 注意：类中部分方法使用双下划线命名（私有），会被 Python 名称改写（name mangling）。
 
+class Uploader:
+    """
+    Uploader 类封装与飞书表格（Spreadsheet）交互的功能：
+    - 上传数据到指定工作表（append 行）
+    - 删除指定范围行（清空数据）
+    - 获取工作表行数（通过 sheets API）
+    - 从本地读取生成的 Excel 并上传
+    - 重置（清空）所有小组的表格
+
+    配置项：
+    - spreadsheet_token: 每个小组对应的 (spreadsheet_id, sheet_id)
+    - app_id / app_secret: 用于获取 tenant_access_token
+    """
+
+    # 小组 -> [spreadsheet_id, sheet_id] 映射
     spreadsheet_token = {"书法组": ["IXrnsAVd6h9u2Lt9Tt7cOwEonzg", "01171e"],
                         "国画组": ["EKIosEUJLhc2Z8tvzoecJjCEnWe", "01171e"],
                         "篆刻组": ["EaE0ww3yQiNncbkiqnkcXgjVncd", "81776e"],
                         "西画组": ["Jp1TsCc5QhwaLttc5jvcZwQAnxc", "01171e"],
                         "漫画组": ["Sm0KsWsQohwxrztfAtAcJmDRnSc", "01171e"]}
-
+    
+    # 应用凭证（用于内部获取 tenant_access_token）
     app_id = "cli_a86924444cb8d00c"
     app_secret = "ydkzWor6TkJGTa7WZrtHBUfGJ1mNWmn0"
 
-    def __upload_to_feishu(authorization_token, data, group_name):
+    def __upload_to_feishu(authorization_token: str, data: pd.DataFrame, group_name: str):
+        """
+        私有方法：将 DataFrame 数据追加写入飞书表格指定 sheet。
+
+        参数：
+        - authorization_token: Bearer token 字符串
+        - data: pandas.DataFrame，要上传的数据（不包含标题行）
+        - group_name: 小组名称，用于从 spreadsheet_token 中查表ID
+        """
         if group_name not in Uploader.spreadsheet_token:
             print(f"未知小组: {group_name}")
             return
@@ -67,7 +92,17 @@ class Uploader:
         else:
             print(f"上传失败: HTTP {response.status} {response.reason}, 响应: {resp_json}")
 
-    def __delete_data(authorization_token, group_name, row):
+    def __delete_data(authorization_token: str, group_name: str, row: int):
+        """
+        私有方法：删除指定 sheet 中从 startIndex（固定为2）到 endIndex（row）之间的行。
+
+        参数：
+        - authorization_token: Bearer token
+        - group_name: 小组名称
+        - row: 要删除的结束行索引（integer）
+
+        注意：接口使用 DELETE /dimension_range，传入的 sheetId 实为 sheet 的 id（需与 API 文档一致）
+        """
         if group_name not in Uploader.spreadsheet_token:
             print(f"未知小组: {group_name}")
             return
@@ -110,7 +145,18 @@ class Uploader:
         else:
             print(f"删除失败: HTTP {response.status} {response.reason}, 响应: {resp_json}")
 
-    def __get_sheet_rows(authorization_token, group_name):
+    def __get_sheet_rows(authorization_token: str, group_name: str) -> int:
+        """
+        私有方法：获取指定 sheet 的行数或合并单元格信息，用于判断当前已占用的行。
+
+        参数：
+        - authorization_token: 带 'Bearer ' 前缀的 tenant_access_token
+        - group_name: 小组名称（如 "书法组"）
+
+        返回：
+        - 若成功，返回正整数（行数 merges[0].end_row_index）
+        - 失败时返回 0
+        """
         if group_name not in Uploader.spreadsheet_token:
             print(f"未知小组: {group_name}")
             return 0
@@ -158,26 +204,53 @@ class Uploader:
             print(f"获取行数失败: HTTP {response.status} {response.reason}, 响应: {resp_json}")
             return 0
 
-    def parse_excel(authorization_token, dir, time_str):
+    def parse_excel(authorization_token: str, dir: str, time_str: str) -> str:
+        """
+        从指定目录读取按小组命名的面试信息 Excel，并上传到对应的小组表格。
+
+        参数：
+        - authorization_token: 用于获取 tenant_access_token 的初始 token（例如管理员 token）
+        - dir: 存放本地文件的目录路径
+        - time_str: 文件名中的时间戳部分，用于匹配文件名
+
+        返回：
+        - 最终使用的 tenant_access_token（带 'Bearer ' 前缀）
+        """
+        authorization_token = Uploader.__get_tanent_access_token(authorization_token)
         for catagory in Uploader.spreadsheet_token.keys():
             file_path = f"{dir}/{catagory}面试信息_{time_str}.xlsx"
             if os.path.exists(file_path):
                 data = pd.read_excel(file_path)
                 Uploader.upload_to_feishu(authorization_token, data, catagory)
 
-        return Uploader.get_tanent_access_token(authorization_token)
+        return authorization_token
             
-    def reset_all_sheets(authorization_token):
+    def reset_all_sheets(authorization_token: str) -> str:
+        """
+        清空所有小组表格中的数据（保留表头）。
+
+        返回新的 tenant_access_token（带 'Bearer ' 前缀）。
+        """
+        authorization_token = Uploader.__get_tanent_access_token(authorization_token)
         for catagory in Uploader.spreadsheet_token.keys():
             rows = Uploader.get_sheet_rows(catagory)
             print(f"正在清空 {catagory} 小组数据，共 {rows - 1} 行")
             if rows > 1:
                 Uploader.delete_data(authorization_token, catagory, rows)
 
-        return Uploader.get_tanent_access_token(authorization_token)
+        return authorization_token
 
-    def __get_tanent_access_token(last_token):
-
+    def __get_tanent_access_token(last_token: str) -> str | None:
+        """
+        私有方法：使用 app_id/app_secret 请求 tenant_access_token。
+        
+        参数：
+        - last_token: 初始 Authorization（如管理员 token）
+        
+        返回：
+        - 成功：字符串 "Bearer _tenant_access_token_"
+        - 失败：None
+        """
         conn = http.client.HTTPSConnection("open.feishu.cn")
         payload = json.dumps({
         "app_id": Uploader.app_id,
