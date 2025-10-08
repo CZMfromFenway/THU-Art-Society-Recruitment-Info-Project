@@ -135,4 +135,4 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     recruitment = RecruitmentDataSync(wjx_url, wjx_cookie, raw_data_file, grouped_data_dir, feishu_token, period)
-    recruitment.start(True)
+    recruitment.start(args.reset)
