@@ -225,7 +225,7 @@ def process_recruitment_data(file_path, output_dir = "grouped_data", cutoff_time
             print(f"  数据预览（前3行）:")
             print(result_df.head(3).to_string(index=False))
 
-            return time_str  # 返回时间字符串以便上传程序找到应上传的表格
+        return time_str  # 返回时间字符串以便上传程序找到应上传的表格
             
     except Exception as e:
         print(f"处理过程中出现错误: {e}")
