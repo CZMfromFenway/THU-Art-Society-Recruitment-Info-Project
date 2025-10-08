@@ -28,24 +28,24 @@ class RecruitmentDataSync:
         self.feishu_token = feishu_token
         self.period = preiod
 
-    def start(reset = False):
+    def start(self, reset = False):
 
         if reset:
-            RecruitmentDataSync.feishu_token = RecruitmentDataSync.uploader.reset_all_sheets(RecruitmentDataSync.feishu_token)
+            self.feishu_token = self.uploader.reset_all_sheets(self.feishu_token)
             print("重置飞书表格完成")
-            if os.path.exists(RecruitmentDataSync.raw_data_file):
-                os.remove(RecruitmentDataSync.raw_data_file)
+            if os.path.exists(self.raw_data_file):
+                os.remove(self.raw_data_file)
                 print("删除本地原始数据完成")
-            if os.path.exists(RecruitmentDataSync.grouped_data_dir):
-                for file in os.listdir(RecruitmentDataSync.grouped_data_dir):
-                    os.remove(os.path.join(RecruitmentDataSync.grouped_data_dir, file))
+            if os.path.exists(self.grouped_data_dir):
+                for file in os.listdir(self.grouped_data_dir):
+                    os.remove(os.path.join(self.grouped_data_dir, file))
                 print("删除本地分组数据完成")
 
-        output_file = RecruitmentDataSync.raw_data_file
+        output_file = self.raw_data_file
         
         # 解析Cookie
         cookies = {}
-        for item in RecruitmentDataSync.wjx_cookie.split(';'):
+        for item in self.wjx_cookie.split(';'):
             item = item.strip()
             if '=' in item:
                 key, value = item.split('=', 1)
@@ -87,20 +87,22 @@ class RecruitmentDataSync:
         count = 0
         data_count = 0
         duplicate_count = 0
+        last_time = datetime.min
 
         try:
             while True:
                 count += 1
                 print(f"\n第 {count} 次尝试导出...")
                 
-                new_data_count, duplicate_count = collect_raw_data.export(session, RecruitmentDataSync.wjx_url, headers, output_file, existing_hashes, data_count, duplicate_count)
+                new_data_count, duplicate_count = collect_raw_data.export(session, self.wjx_url, headers, output_file, existing_hashes, data_count, duplicate_count)
                 
                 if new_data_count > data_count:
                     data_count = new_data_count
                     # 数据归类
-                    time_str = parse_raw_data.process_recruitment_data(output_file, RecruitmentDataSync.grouped_data_dir, datetime.now())
+                    time_str = parse_raw_data.process_recruitment_data(output_file, self.grouped_data_dir, last_time)
+                    last_time = datetime.now()
                     # 上传飞书
-                    RecruitmentDataSync.feishu_token = RecruitmentDataSync.uploader.parse_excel(RecruitmentDataSync.feishu_token, RecruitmentDataSync.grouped_data_dir, time_str)
+                    self.feishu_token = self.uploader.parse_excel(self.feishu_token, self.grouped_data_dir, time_str)
                 
                 # 等待
                 for i in range(5, 0, -1):
@@ -132,4 +134,5 @@ if __name__ == "__main__":
     parser.add_argument('-r', '--reset', action='store_true', help='重置飞书表格和本地数据（默认否）')
     args = parser.parse_args()
 
-    RecruitmentDataSync(wjx_url, wjx_cookie, raw_data_file, grouped_data_dir, feishu_token, period).start(args.reset)
+    recruitment = RecruitmentDataSync(wjx_url, wjx_cookie, raw_data_file, grouped_data_dir, feishu_token, period)
+    recruitment.start(True)

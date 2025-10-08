@@ -2,6 +2,7 @@ import pandas as pd
 import http.client
 import json
 import os
+import datetime
 
 # 模块说明：用于将本地生成的面试信息表上传到飞书表格，并提供清空/查询表格行数等工具函数。
 # 注意：类中部分方法使用双下划线命名（私有），会被 Python 名称改写（name mangling）。
@@ -31,7 +32,7 @@ class Uploader:
     app_id = "cli_a86924444cb8d00c"
     app_secret = "ydkzWor6TkJGTa7WZrtHBUfGJ1mNWmn0"
 
-    def __upload_to_feishu(authorization_token: str, data: pd.DataFrame, group_name: str):
+    def __upload_to_feishu(self, authorization_token: str, data: pd.DataFrame, group_name: str):
         """
         私有方法：将 DataFrame 数据追加写入飞书表格指定 sheet。
 
@@ -40,11 +41,11 @@ class Uploader:
         - data: pandas.DataFrame，要上传的数据（不包含标题行）
         - group_name: 小组名称，用于从 spreadsheet_token 中查表ID
         """
-        if group_name not in Uploader.spreadsheet_token:
+        if group_name not in self.spreadsheet_token:
             print(f"未知小组: {group_name}")
             return
 
-        spreadSheetToken, sheetId = Uploader.spreadsheet_token[group_name]
+        spreadSheetToken, sheetId = self.spreadsheet_token[group_name]
         path = f"/open-apis/sheets/v2/spreadsheets/{spreadSheetToken}/values_append?insertDataOption=INSERT_ROWS"
 
         # 准备数据
@@ -56,6 +57,12 @@ class Uploader:
             for c in range(len(values[r])):
                 if pd.isna(values[r][c]):
                     values[r][c] = ""
+
+        # 将其中的TimeStamp等数字转换为字符串，避免飞书表格误判
+        for r in range(len(values)):
+            for c in range(len(values[r])):
+                if not isinstance(values[r][c], (float, int)):
+                    values[r][c] = str(values[r][c])
         
         conn = http.client.HTTPSConnection("open.feishu.cn")
 
@@ -92,7 +99,7 @@ class Uploader:
         else:
             print(f"上传失败: HTTP {response.status} {response.reason}, 响应: {resp_json}")
 
-    def __delete_data(authorization_token: str, group_name: str, row: int):
+    def __delete_data(self, authorization_token: str, group_name: str, row: int):
         """
         私有方法：删除指定 sheet 中从 startIndex（固定为2）到 endIndex（row）之间的行。
 
@@ -103,11 +110,11 @@ class Uploader:
 
         注意：接口使用 DELETE /dimension_range，传入的 sheetId 实为 sheet 的 id（需与 API 文档一致）
         """
-        if group_name not in Uploader.spreadsheet_token:
+        if group_name not in self.spreadsheet_token:
             print(f"未知小组: {group_name}")
             return
 
-        spreadSheetToken, sheedId = Uploader.spreadsheet_token[group_name]
+        spreadSheetToken, sheedId = self.spreadsheet_token[group_name]
         path = f"/open-apis/sheets/v2/spreadsheets/{spreadSheetToken}/dimension_range"
 
         conn = http.client.HTTPSConnection("open.feishu.cn")
@@ -145,7 +152,7 @@ class Uploader:
         else:
             print(f"删除失败: HTTP {response.status} {response.reason}, 响应: {resp_json}")
 
-    def __get_sheet_rows(authorization_token: str, group_name: str) -> int:
+    def __get_sheet_rows(self, authorization_token: str, group_name: str) -> int:
         """
         私有方法：获取指定 sheet 的行数或合并单元格信息，用于判断当前已占用的行。
 
@@ -157,11 +164,11 @@ class Uploader:
         - 若成功，返回正整数（行数 merges[0].end_row_index）
         - 失败时返回 0
         """
-        if group_name not in Uploader.spreadsheet_token:
+        if group_name not in self.spreadsheet_token:
             print(f"未知小组: {group_name}")
             return 0
 
-        spreadSheetToken, sheedId = Uploader.spreadsheet_token[group_name]
+        spreadSheetToken, sheedId = self.spreadsheet_token[group_name]
 
         path = f"/open-apis/sheets/v3/spreadsheets/{spreadSheetToken}/sheets/{sheedId}"
 
@@ -204,7 +211,7 @@ class Uploader:
             print(f"获取行数失败: HTTP {response.status} {response.reason}, 响应: {resp_json}")
             return 0
 
-    def parse_excel(authorization_token: str, dir: str, time_str: str) -> str:
+    def parse_excel(self, authorization_token: str, dir: str, time_str: str) -> str:
         """
         从指定目录读取按小组命名的面试信息 Excel，并上传到对应的小组表格。
 
@@ -216,31 +223,31 @@ class Uploader:
         返回：
         - 最终使用的 tenant_access_token（带 'Bearer ' 前缀）
         """
-        authorization_token = Uploader.__get_tanent_access_token(authorization_token)
-        for catagory in Uploader.spreadsheet_token.keys():
+        authorization_token = self.__get_tanent_access_token(authorization_token)
+        for catagory in self.spreadsheet_token.keys():
             file_path = f"{dir}/{catagory}面试信息_{time_str}.xlsx"
             if os.path.exists(file_path):
                 data = pd.read_excel(file_path)
-                Uploader.upload_to_feishu(authorization_token, data, catagory)
+                self.__upload_to_feishu(authorization_token, data, catagory)
 
         return authorization_token
             
-    def reset_all_sheets(authorization_token: str) -> str:
+    def reset_all_sheets(self, authorization_token: str) -> str:
         """
         清空所有小组表格中的数据（保留表头）。
 
         返回新的 tenant_access_token（带 'Bearer ' 前缀）。
         """
-        authorization_token = Uploader.__get_tanent_access_token(authorization_token)
-        for catagory in Uploader.spreadsheet_token.keys():
-            rows = Uploader.get_sheet_rows(catagory)
+        authorization_token = self.__get_tanent_access_token(authorization_token)
+        for catagory in self.spreadsheet_token.keys():
+            rows = self.__get_sheet_rows(authorization_token, catagory)
             print(f"正在清空 {catagory} 小组数据，共 {rows - 1} 行")
             if rows > 1:
-                Uploader.delete_data(authorization_token, catagory, rows)
+                self.__delete_data(authorization_token, catagory, rows)
 
         return authorization_token
 
-    def __get_tanent_access_token(last_token: str) -> str | None:
+    def __get_tanent_access_token(self, last_token: str) -> str | None:
         """
         私有方法：使用 app_id/app_secret 请求 tenant_access_token。
         
@@ -253,8 +260,8 @@ class Uploader:
         """
         conn = http.client.HTTPSConnection("open.feishu.cn")
         payload = json.dumps({
-        "app_id": Uploader.app_id,
-        "app_secret": Uploader.app_secret
+        "app_id": self.app_id,
+        "app_secret": self.app_secret
         })
         headers = {
         'Authorization': last_token,
