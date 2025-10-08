@@ -105,7 +105,7 @@ class RecruitmentDataSync:
                     self.feishu_token = self.uploader.parse_excel(self.feishu_token, self.grouped_data_dir, time_str)
                 
                 # 等待
-                for i in range(5, 0, -1):
+                for i in range(self.period, 0, -1):
                     print(f"\r下次尝试: {i}秒后", end='', flush=True)
                     time.sleep(1)
                 print('\r', end='', flush=True)
