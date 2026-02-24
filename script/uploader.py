@@ -24,7 +24,7 @@ class Uploader:
     # 小组 -> [spreadsheet_id, sheet_id] 映射
     spreadsheet_token = {"书法组": ["IXrnsAVd6h9u2Lt9Tt7cOwEonzg", "01171e"],
                         "国画组": ["EKIosEUJLhc2Z8tvzoecJjCEnWe", "01171e"],
-                        "篆刻组": ["EaE0ww3yQiNncbkiqnkcXgjVncd", "81776e"],
+                        "篆刻组": ["EAOgsDl7xhKgoBtWKBzc2gnonCf", "81776e"],
                         "西画组": ["Jp1TsCc5QhwaLttc5jvcZwQAnxc", "01171e"],
                         "漫画组": ["Sm0KsWsQohwxrztfAtAcJmDRnSc", "01171e"]}
     
