@@ -25,7 +25,15 @@ def map_column_to_time_label(column_name):
     """
     将原始列名映射为简化的时间标签
     """
-    if '周三' in column_name and '14：00' in column_name:
+    if '周一' in column_name and '14：00' in column_name:
+        return '周一下午'
+    elif '周一' in column_name and '18：00' in column_name:
+        return '周一晚上'
+    elif '周二' in column_name and '14：00' in column_name:
+        return '周二下午'
+    elif '周二' in column_name and '18：00' in column_name:
+        return '周二晚上'
+    elif '周三' in column_name and '14：00' in column_name:
         return '周三下午'
     elif '周三' in column_name and '18：00' in column_name:
         return '周三晚上'
@@ -37,6 +45,14 @@ def map_column_to_time_label(column_name):
         return '周五下午'
     elif '周五' in column_name and '18：00' in column_name:
         return '周五晚上'
+    elif '周六' in column_name and '14：00' in column_name:
+        return '周六下午'
+    elif '周六' in column_name and '18：00' in column_name:
+        return '周六晚上'
+    elif '周日' in column_name and '14：00' in column_name:
+        return '周日下午'
+    elif '周日' in column_name and '18：00' in column_name:
+        return '周日晚上'
     else:
         # 如果无法识别，返回原始列名的简化版本
         return re.sub(r'[^周一二三四五六日下午晚上]', '', column_name)
